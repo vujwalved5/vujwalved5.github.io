@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Stroke Capture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & Foundation ── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #F4F2ED;
+      --surface: #FFFFFF;
+      --text: #1C1C1E;
+      --text-secondary: #6E6E73;
+      --text-tertiary: #AEAEB2;
+      --ink: #1A1A2E;
+      --primary: #3478F6;
+      --primary-active: #2660D4;
+      --danger: #FF3B30;
+      --success: #30D158;
+      --success-bg: #E8F9EE;
+      --error-bg: #FEECEB;
+      --border: #D6D3CC;
+      --border-light: #E8E5DF;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --shadow-soft: 0 1px 3px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
+      --shadow-medium: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%; overflow: hidden;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    /* ── App Shell ── */
+    #app {
+      display: flex; flex-direction: column;
+      height: 100%;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px 6px;
+      flex-shrink: 0;
+    }
+    .app-title {
+      font-size: 15px; font-weight: 700; letter-spacing: -0.2px;
+      color: var(--text);
+    }
+    .header-actions { display: flex; gap: 6px; align-items: center; }
+
+    .chip-btn {
+      font-family: var(--font);
+      font-size: 12px; font-weight: 600;
+      padding: 5px 12px; border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .chip-btn:active { transform: scale(0.95); background: var(--bg); }
+    .chip-btn.active { border-color: var(--primary); color: var(--primary); background: #EBF2FE; }
+
+    .icon-btn {
+      width: 34px; height: 34px;
+      border-radius: 50%; border: none;
+      background: var(--surface);
+      color: var(--text-secondary);
+      font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-soft);
+      transition: all 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+    }
+    .icon-btn:active { transform: scale(0.9); }
+    .icon-btn .badge {
+      position: absolute; top: -2px; right: -2px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--danger); color: #fff;
+      font-size: 9px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+    }
+
+    /* ── Prompt Section ── */
+    #prompt-section {
+      flex-shrink: 0;
+      padding: 4px 16px 12px;
+      text-align: center;
+    }
+    .prompt-label {
+      font-size: 12px; font-weight: 500;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    #char-box {
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      width: 80px; height: 88px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-medium);
+      margin-bottom: 10px;
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+    }
+    #char-box.transitioning {
+      transform: scale(0.85);
+      opacity: 0.3;
+    }
+    #char-display {
+      font-family: 'Courier New', 'SF Mono', 'Menlo', monospace;
+      font-size: 52px; font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+      user-select: none;
+    }
+
+    #free-input-wrap {
+      display: none;
+      margin-bottom: 10px;
+    }
+    #free-input {
+      font-family: var(--font);
+      font-size: 28px; font-weight: 600;
+      text-align: center;
+      width: 160px; padding: 8px 12px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    #free-input:focus { border-color: var(--primary); }
+
+    /* Progress bar */
+    #progress-track {
+      width: 100%; max-width: 280px;
+      height: 4px; border-radius: 2px;
+      background: var(--border-light);
+      margin: 0 auto 6px;
+      overflow: hidden;
+    }
+    #progress-fill {
+      height: 100%; border-radius: 2px;
+      background: var(--primary);
+      transition: width 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+      width: 0%;
+    }
+    #progress-text {
+      font-size: 12px; font-weight: 500;
+      color: var(--text-secondary);
+      letter-spacing: 0.1px;
+    }
+
+    /* ── Canvas Section ── */
+    #canvas-section {
+      flex: 1; min-height: 0;
+      padding: 0 16px;
+      display: flex;
+    }
+    #canvas-container {
+      position: relative;
+      width: 100%;
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+      border: 1.5px solid var(--border-light);
+      overflow: hidden;
+    }
+    #drawing-canvas {
+      display: block;
+      width: 100%; height: 100%;
+      touch-action: none;
+      cursor: crosshair;
+    }
+    #canvas-hint {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 15px; font-weight: 500;
+      color: var(--text-tertiary);
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      user-select: none;
+    }
+    #canvas-hint.hidden { opacity: 0; }
+
+    /* ── Controls ── */
+    #controls {
+      flex-shrink: 0;
+      display: flex; gap: 10px;
+      padding: 12px 16px 12px;
+    }
+    .ctrl-btn {
+      flex: 1;
+      font-family: var(--font);
+      font-size: 15px; font-weight: 600;
+      padding: 13px 8px;
+      border-radius: var(--radius-sm);
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+      overflow: hidden;
+    }
+    .ctrl-btn:active:not(:disabled) { transform: scale(0.96); }
+    .ctrl-btn:disabled { opacity: 0.4; cursor: default; }
+
+    .ctrl-btn.secondary {
+      background: var(--bg);
+      color: var(--text-secondary);
+      border: 1.5px solid var(--border);
+    }
+    .ctrl-btn.secondary:active:not(:disabled) { background: var(--border-light); }
+
+    .ctrl-btn.primary {
+      background: var(--primary);
+      color: #FFFFFF;
+    }
+    .ctrl-btn.primary:active:not(:disabled) { background: var(--primary-active); }
+    .ctrl-btn.primary.submitting {
+      pointer-events: none;
+    }
+
+    /* ── Session footer ── */
+    #session-footer {
+      flex-shrink: 0;
+      padding: 4px 16px 10px;
+      text-align: center;
+    }
+    #session-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 500;
+      color: var(--text-tertiary);
+      background: var(--surface);
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #session-tag:active { background: var(--bg); }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; flex-direction: column; align-items: center;
+      padding-top: calc(var(--safe-top) + 12px);
+      pointer-events: none;
+      z-index: 1000;
+    }
+    .toast {
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      font-size: 14px; font-weight: 600;
+      box-shadow: var(--shadow-medium);
+      pointer-events: auto;
+      animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      margin-bottom: 8px;
+    }
+    .toast.success { background: var(--success-bg); color: #0A7B3E; }
+    .toast.error   { background: var(--error-bg);   color: #C92A2A; }
+    .toast.exiting {
+      animation: toastOut 0.25s ease forwards;
+    }
+    @keyframes toastIn {
+      from { transform: translateY(-30px) scale(0.9); opacity: 0; }
+      to   { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    @keyframes toastOut {
+      to { transform: translateY(-20px); opacity: 0; }
+    }
+
+    /* ── Modal / Panel Overlay ── */
+    .panel {
+      position: fixed; inset: 0;
+      z-index: 900;
+      display: flex; align-items: flex-end; justify-content: center;
+      transition: opacity 0.2s ease;
+    }
+    .panel.hidden { display: none; }
+    .panel-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.35);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+    }
+    .panel-sheet {
+      position: relative;
+      width: 100%; max-width: 440px;
+      background: var(--surface);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 24px 20px calc(24px + var(--safe-bottom));
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+      animation: sheetUp 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
+    }
+    .panel.centered { align-items: center; }
+    .panel.centered .panel-sheet {
+      border-radius: var(--radius);
+      margin: 20px;
+      animation: modalPop 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    @keyframes sheetUp {
+      from { transform: translateY(60px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes modalPop {
+      from { transform: scale(0.85); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
+    .panel-sheet h3 {
+      font-size: 18px; font-weight: 700;
+      margin-bottom: 16px; letter-spacing: -0.3px;
+    }
+    .info-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 14px;
+    }
+    .info-row label { color: var(--text-secondary); font-weight: 500; }
+    .info-row .value { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .info-row code {
+      font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;
+      font-size: 12px;
+      background: var(--bg);
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+    .btn-copy-sm {
+      font-size: 14px; padding: 2px;
+      background: none; border: none; cursor: pointer;
+      opacity: 0.5; transition: opacity 0.15s;
+    }
+    .btn-copy-sm:active { opacity: 1; }
+
+    .panel-sheet .ctrl-btn { margin-top: 12px; }
+    .ctrl-btn.full-width { width: 100%; }
+
+    .celebration {
+      font-size: 48px;
+      margin-bottom: 8px;
+      animation: celebBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes celebBounce {
+      0%   { transform: scale(0) rotate(-20deg); }
+      60%  { transform: scale(1.2) rotate(5deg); }
+      100% { transform: scale(1) rotate(0); }
+    }
+    .panel-sheet .hint {
+      font-size: 13px; color: var(--text-tertiary);
+      margin: 6px 0 8px;
+    }
+    .panel-sheet.centered-text { text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <span class="app-title">✍️ Stroke Capture</span>
+      <div class="header-actions">
+        <button id="btn-mode" class="chip-btn active" aria-label="Toggle capture mode">Prompted</button>
+        <button id="btn-info" class="icon-btn" aria-label="Session info">
+          <span>ℹ️</span>
+          <span id="retry-badge" class="badge" style="display:none">0</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Prompt -->
+    <section id="prompt-section">
+      <span class="prompt-label" id="prompt-label">Write this character</span>
+      <div id="char-box"><span id="char-display">A</span></div>
+      <div id="free-input-wrap">
+        <input id="free-input" type="text" maxlength="5" placeholder="Label" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div id="progress-track"><div id="progress-fill"></div></div>
+      <div id="progress-text">1 of 78 · Pass 1</div>
+    </section>
+
+    <!-- Canvas -->
+    <section id="canvas-section">
+      <div id="canvas-container">
+        <canvas id="drawing-canvas"></canvas>
+        <div id="canvas-hint">Touch to draw</div>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section id="controls">
+      <div id="retry-inline" style="display:none; width:100%; margin-bottom:8px;">
+        <button id="btn-retry-inline" class="ctrl-btn primary full-width" style="background:#FF9500;">⟳ Retry submission</button>
+      </div>
+      <div id="ctrl-buttons" style="display:flex;gap:10px;width:100%;">
+        <button id="btn-undo" class="ctrl-btn secondary" disabled>↩ Undo</button>
+        <button id="btn-clear" class="ctrl-btn secondary" disabled>✕ Clear</button>
+        <button id="btn-submit" class="ctrl-btn primary" disabled>Submit →</button>
+      </div>
+    </section>
+
+    <!-- Session footer -->
+    <div id="session-footer">
+      <span id="session-tag" title="Tap to copy session ID">
+        <span>🔗</span>
+        <span id="session-short">—</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div id="toast-container"></div>
+
+  <!-- Info Panel -->
+  <div id="info-panel" class="panel hidden">
+    <div class="panel-backdrop" data-close="info-panel"></div>
+    <div class="panel-sheet">
+      <h3>Session Info</h3>
+      <div class="info-row">
+        <label>Session ID</label>
+        <div class="value">
+          <code id="info-session-id">—</code>
+          <button class="btn-copy-sm" id="btn-copy-session" title="Copy">📋</button>
+        </div>
+      </div>
+      <div class="info-row">
+        <label>Submitted</label>
+        <span class="value" id="info-total">0</span>
+      </div>
+      <div class="info-row" id="retry-row" style="display:none">
+        <label>Pending retries</label>
+        <div class="value">
+          <span id="info-retry-count">0</span>
+          <button class="chip-btn" id="btn-retry" style="margin-left:6px;font-size:11px;padding:3px 10px">Retry</button>
+        </div>
+      </div>
+      <button class="ctrl-btn secondary full-width" data-close="info-panel">Close</button>
+    </div>
+  </div>
+
+  <!-- Pass Complete -->
+  <div id="pass-complete" class="panel centered hidden">
+    <div class="panel-backdrop"></div>
+    <div class="panel-sheet centered-text">
+      <div class="celebration">🎉</div>
+      <h3>Pass <span id="pc-pass-num">1</span> Complete!</h3>
+      <p class="hint"><span id="pc-stats">78</span> samples captured this pass</p>
+      <p class="hint">More passes improve variation &amp; training quality</p>
+      <button id="btn-next-pass" class="ctrl-btn primary full-width">Start Pass <span id="pc-next-num">2</span></button>
+      <button id="btn-done" class="ctrl-btn secondary full-width">Done for now</button>
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   Configuration
+   ============================================================ */
+const WEBHOOK_URL = 'https://vujwalved.app.n8n.cloud/webhook/stroke-capture';
+
+const UPPERCASE   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const LOWERCASE   = 'abcdefghijklmnopqrstuvwxyz'.split('');
+const DIGITS      = '0123456789'.split('');
+const PUNCTUATION = ['.', ',', ';', ':', '!', '?', "'", '"', '-', '(', ')', '/', '@', '#', '&', '+'];
+const CHARSET     = [...UPPERCASE, ...LOWERCASE, ...DIGITS, ...PUNCTUATION];
+
+const STORAGE = {
+  SESSION: 'sc_session_id',
+  RETRY:   'sc_retry_queue',
+  TOTAL:   'sc_total_submitted',
+};
+
+/* ============================================================
+   State
+   ============================================================ */
+const state = {
+  mode: 'prompted',          // 'prompted' | 'free'
+  sessionId: '',
+  charIndex: 0,
+  passNumber: 1,
+  passSubmitted: 0,          // submitted this pass
+  totalSubmitted: 0,
+  strokes: [],               // Array<Array<{x,y,t}>> for current character
+  activeStrokeIdx: -1,
+  isDrawing: false,
+  captureStartTime: null,    // ms (performance.now) when first pointerdown for this char
+  submitting: false,
+};
+
+/* ============================================================
+   DOM refs
+   ============================================================ */
+const $ = (s) => document.querySelector(s);
+const canvas       = $('#drawing-canvas');
+const ctx          = canvas.getContext('2d');
+const canvasContainer = $('#canvas-container');
+const canvasHint   = $('#canvas-hint');
+const charBox      = $('#char-box');
+const charDisplay  = $('#char-display');
+const freeWrap     = $('#free-input-wrap');
+const freeInput    = $('#free-input');
+const promptLabel  = $('#prompt-label');
+const progressFill = $('#progress-fill');
+const progressText = $('#progress-text');
+const btnUndo      = $('#btn-undo');
+const btnClear     = $('#btn-clear');
+const btnSubmit    = $('#btn-submit');
+const btnMode      = $('#btn-mode');
+const btnInfo      = $('#btn-info');
+const retryBadge   = $('#retry-badge');
+const sessionShort = $('#session-short');
+const infoPanel    = $('#info-panel');
+const passPanel    = $('#pass-complete');
+
+/* ============================================================
+   Session management
+   ============================================================ */
+function getOrCreateSession() {
+  let id = localStorage.getItem(STORAGE.SESSION);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(STORAGE.SESSION, id);
+  }
+  return id;
+}
+
+function loadTotalSubmitted() {
+  return parseInt(localStorage.getItem(STORAGE.TOTAL) || '0', 10);
+}
+function saveTotalSubmitted(n) {
+  localStorage.setItem(STORAGE.TOTAL, String(n));
+}
+
+/* ============================================================
+   Retry queue (localStorage-backed)
+   ============================================================ */
+function getRetryQueue() {
+  try { return JSON.parse(localStorage.getItem(STORAGE.RETRY) || '[]'); }
+  catch { return []; }
+}
+function saveRetryQueue(q) {
+  localStorage.setItem(STORAGE.RETRY, JSON.stringify(q));
+}
+function enqueueRetry(payload) {
+  const q = getRetryQueue();
+  q.push(payload);
+  saveRetryQueue(q);
+  updateRetryBadge();
+}
+async function flushRetryQueue() {
+  const q = getRetryQueue();
+  if (!q.length) return;
+  const remaining = [];
+  for (const payload of q) {
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) remaining.push(payload);
+    } catch {
+      remaining.push(payload);
+    }
+  }
+  saveRetryQueue(remaining);
+  updateRetryBadge();
+  if (remaining.length === 0 && q.length > 0) {
+    showToast(`Retried ${q.length} sample(s) successfully`, 'success');
+  } else if (remaining.length > 0) {
+    showToast(`${remaining.length} sample(s) still pending`, 'error');
+  }
+}
+function updateRetryBadge() {
+  const q = getRetryQueue();
+  const n = q.length;
+  retryBadge.style.display = n > 0 ? 'flex' : 'none';
+  retryBadge.textContent = n > 9 ? '9+' : String(n);
+  const retryRow = $('#retry-row');
+  if (retryRow) retryRow.style.display = n > 0 ? 'flex' : 'none';
+  const infoRetry = $('#info-retry-count');
+  if (infoRetry) infoRetry.textContent = String(n);
+}
+
+/* ============================================================
+   Canvas setup & drawing
+   ============================================================ */
+const INK_COLOR = '#1A1A2E';
+const LINE_WIDTH = 2.5;
+
+function setupCanvas() {
+  const rect = canvasContainer.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+  applyCtxStyles();
+}
+
+function applyCtxStyles() {
+  ctx.strokeStyle = INK_COLOR;
+  ctx.fillStyle   = INK_COLOR;
+  ctx.lineWidth   = LINE_WIDTH;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+}
+
+function clearCanvas() {
+  const rect = canvasContainer.getBoundingClientRect();
+  ctx.clearRect(0, 0, rect.width, rect.height);
+}
+
+function redrawAllStrokes() {
+  clearCanvas();
+  applyCtxStyles();
+  for (const stroke of state.strokes) {
+    drawStrokePoints(stroke);
+  }
+}
+
+function drawStrokePoints(points) {
+  if (!points || points.length === 0) return;
+  if (points.length === 1) {
+    ctx.beginPath();
+    ctx.arc(points[0].x, points[0].y, LINE_WIDTH / 2, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  if (points.length === 2) {
+    ctx.lineTo(points[1].x, points[1].y);
+  } else {
+    // Smooth quadratic bezier through midpoints
+    for (let i = 1; i < points.length - 1; i++) {
+      const mx = (points[i].x + points[i + 1].x) / 2;
+      const my = (points[i].y + points[i + 1].y) / 2;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, mx, my);
+    }
+    const last = points[points.length - 1];
+    ctx.lineTo(last.x, last.y);
+  }
+  ctx.stroke();
+}
+
+/* ============================================================
+   Pointer event handlers
+   ============================================================ */
+function getCanvasPoint(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: Math.round((e.clientX - rect.left) * 10) / 10,
+    y: Math.round((e.clientY - rect.top)  * 10) / 10,
+  };
+}
+
+function onPointerDown(e) {
+  if (state.submitting) return;
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+
+  // First touch for this character → start the clock
+  if (state.captureStartTime === null) {
+    state.captureStartTime = performance.now();
+  }
+
+  const pt = getCanvasPoint(e);
+  pt.t = Math.round(performance.now() - state.captureStartTime);
+
+  const newStroke = [pt];
+  state.strokes.push(newStroke);
+  state.activeStrokeIdx = state.strokes.length - 1;
+  state.isDrawing = true;
+
+  // Visual: dot
+  ctx.beginPath();
+  ctx.arc(pt.x, pt.y, LINE_WIDTH / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  canvasHint.classList.add('hidden');
+  updateControlStates();
+}
+
+function onPointerMove(e) {
+  if (!state.isDrawing) return;
+  e.preventDefault();
+
+  const pt = getCanvasPoint(e);
+  pt.t = Math.round(performance.now() - state.captureStartTime);
+
+  const stroke = state.strokes[state.activeStrokeIdx];
+  const prev = stroke[stroke.length - 1];
+  stroke.push(pt);
+
+  // Draw segment
+  if (stroke.length === 2) {
+    ctx.beginPath();
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+  } else if (stroke.length > 2) {
+    // Smooth: use midpoint from prev-prev to prev as start,
+    // quadratic through prev to midpoint(prev, pt)
+    const pp = stroke[stroke.length - 3];
+    const mx1 = (pp.x + prev.x) / 2;
+    const my1 = (pp.y + prev.y) / 2;
+    const mx2 = (prev.x + pt.x) / 2;
+    const my2 = (prev.y + pt.y) / 2;
+    ctx.beginPath();
+    ctx.moveTo(mx1, my1);
+    ctx.quadraticCurveTo(prev.x, prev.y, mx2, my2);
+    ctx.stroke();
+  }
+}
+
+function onPointerUp(e) {
+  if (!state.isDrawing) return;
+  e.preventDefault();
+  state.isDrawing = false;
+  state.activeStrokeIdx = -1;
+
+  // Full redraw for smooth rendering of the completed stroke
+  redrawAllStrokes();
+  updateControlStates();
+}
+
+canvas.addEventListener('pointerdown', onPointerDown);
+canvas.addEventListener('pointermove', onPointerMove);
+canvas.addEventListener('pointerup', onPointerUp);
+canvas.addEventListener('pointercancel', onPointerUp);
+// Prevent context menu on long-press
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/* ============================================================
+   Actions
+   ============================================================ */
+function undoLastStroke() {
+  if (state.strokes.length === 0) return;
+  state.strokes.pop();
+  if (state.strokes.length === 0) {
+    state.captureStartTime = null;
+  }
+  redrawAllStrokes();
+  updateControlStates();
+}
+
+function clearAllStrokes() {
+  state.strokes = [];
+  state.captureStartTime = null;
+  state.isDrawing = false;
+  state.activeStrokeIdx = -1;
+  clearCanvas();
+  canvasHint.classList.remove('hidden');
+  updateControlStates();
+}
+
+async function submitStrokes() {
+  if (state.submitting) return;
+  if (state.strokes.length === 0) {
+    showToast('Please write something first', 'error');
+    return;
+  }
+
+  const character = state.mode === 'prompted'
+    ? CHARSET[state.charIndex]
+    : freeInput.value.trim();
+
+  if (!character) {
+    showToast('Enter a character label first', 'error');
+    freeInput.focus();
+    return;
+  }
+
+  // Build payload — deep-clone strokes to avoid mutation
+  const payload = {
+    session_id: state.sessionId,
+    character:  character,
+    strokes:    state.strokes.map(s => s.map(p => ({ x: p.x, y: p.y, t: p.t }))),
+  };
+
+  state.submitting = true;
+  btnSubmit.textContent = '···';
+  btnSubmit.classList.add('submitting');
+
+  let success = false;
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      success = true;
+    } else {
+      const body = await res.json().catch(() => ({}));
+      showToast(body.message || `Error ${res.status}`, 'error');
+      enqueueRetry(payload);
+      showInlineRetry(payload);
+    }
+  } catch (err) {
+    showToast('Network error — saved for retry', 'error');
+    enqueueRetry(payload);
+    showInlineRetry(payload);
+  }
+
+  state.submitting = false;
+  btnSubmit.textContent = 'Submit →';
+  btnSubmit.classList.remove('submitting');
+
+  if (success) {
+    state.totalSubmitted++;
+    state.passSubmitted++;
+    saveTotalSubmitted(state.totalSubmitted);
+    showToast('✓ Saved', 'success');
+    clearAllStrokes();
+
+    if (state.mode === 'prompted') {
+      advancePrompted();
+    } else {
+      freeInput.value = '';
+      freeInput.focus();
+    }
+    updateUI();
+    // Also try flushing retry queue opportunistically
+    flushRetryQueue();
+  }
+}
+
+function advancePrompted() {
+  if (state.charIndex < CHARSET.length - 1) {
+    state.charIndex++;
+    animateCharTransition();
+  } else {
+    // Pass complete
+    showPassComplete();
+  }
+}
+
+function animateCharTransition() {
+  charBox.classList.add('transitioning');
+  setTimeout(() => {
+    charDisplay.textContent = CHARSET[state.charIndex];
+    charBox.classList.remove('transitioning');
+  }, 150);
+}
+
+/* ============================================================
+   Pass complete
+   ============================================================ */
+function showPassComplete() {
+  $('#pc-pass-num').textContent = state.passNumber;
+  $('#pc-next-num').textContent = state.passNumber + 1;
+  $('#pc-stats').textContent = state.passSubmitted;
+  passPanel.classList.remove('hidden');
+}
+
+$('#btn-next-pass').addEventListener('click', () => {
+  state.passNumber++;
+  state.charIndex = 0;
+  state.passSubmitted = 0;
+  passPanel.classList.add('hidden');
+  animateCharTransition();
+  updateUI();
+});
+
+$('#btn-done').addEventListener('click', () => {
+  passPanel.classList.add('hidden');
+  showToast(`Done! ${state.totalSubmitted} total samples captured`, 'success');
+});
+
+/* ============================================================
+   Mode toggle
+   ============================================================ */
+function setMode(mode) {
+  state.mode = mode;
+  clearAllStrokes();
+
+  if (mode === 'prompted') {
+    btnMode.textContent = 'Prompted';
+    btnMode.classList.add('active');
+    charBox.style.display = 'inline-flex';
+    freeWrap.style.display = 'none';
+    promptLabel.textContent = 'Write this character';
+    charDisplay.textContent = CHARSET[state.charIndex];
+  } else {
+    btnMode.textContent = 'Free';
+    btnMode.classList.remove('active');
+    charBox.style.display = 'none';
+    freeWrap.style.display = 'block';
+    promptLabel.textContent = 'Enter label, then draw';
+    freeInput.focus();
+  }
+  updateUI();
+}
+
+btnMode.addEventListener('click', () => {
+  setMode(state.mode === 'prompted' ? 'free' : 'prompted');
+});
+
+/* ============================================================
+   Info panel
+   ============================================================ */
+btnInfo.addEventListener('click', () => {
+  $('#info-session-id').textContent = state.sessionId;
+  $('#info-total').textContent = state.totalSubmitted;
+  updateRetryBadge();
+  infoPanel.classList.remove('hidden');
+});
+
+document.querySelectorAll('[data-close]').forEach(el => {
+  el.addEventListener('click', () => {
+    const panelId = el.getAttribute('data-close');
+    document.getElementById(panelId).classList.add('hidden');
+  });
+});
+
+$('#btn-copy-session').addEventListener('click', () => {
+  navigator.clipboard.writeText(state.sessionId).then(() => {
+    showToast('Session ID copied', 'success');
+  });
+});
+
+$('#btn-retry').addEventListener('click', () => {
+  flushRetryQueue();
+});
+
+$('#session-tag').addEventListener('click', () => {
+  navigator.clipboard.writeText(state.sessionId).then(() => {
+    showToast('Session ID copied', 'success');
+  });
+});
+
+/* ============================================================
+   UI updates
+   ============================================================ */
+function updateUI() {
+  // Progress
+  if (state.mode === 'prompted') {
+    const pct = ((state.charIndex) / CHARSET.length) * 100;
+    progressFill.style.width = pct + '%';
+    progressText.textContent =
+      `${state.charIndex + 1} of ${CHARSET.length} · Pass ${state.passNumber} · ${state.totalSubmitted} total`;
+  } else {
+    progressFill.style.width = '0%';
+    progressText.textContent = `${state.totalSubmitted} total submitted`;
+  }
+
+  // Session footer
+  sessionShort.textContent = state.sessionId.slice(0, 8) + '…';
+}
+
+function updateControlStates() {
+  const hasStrokes = state.strokes.length > 0;
+  btnUndo.disabled  = !hasStrokes;
+  btnClear.disabled = !hasStrokes;
+  btnSubmit.disabled = !hasStrokes || state.submitting;
+}
+
+/* ============================================================
+   Toast notifications
+   ============================================================ */
+function showToast(msg, type = 'success') {
+  const container = $('#toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('exiting');
+    toast.addEventListener('animationend', () => toast.remove());
+  }, 1800);
+}
+
+/* ============================================================
+   Keyboard shortcuts (desktop convenience)
+   ============================================================ */
+document.addEventListener('keydown', (e) => {
+  // Don't capture when typing in the free input
+  if (document.activeElement === freeInput) return;
+
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    undoLastStroke();
+  } else if (e.key === 'Escape') {
+    clearAllStrokes();
+  } else if (e.key === 'Enter') {
+    submitStrokes();
+  }
+});
+
+/* ============================================================
+   Inline retry (visible on submission failure)
+   ============================================================ */
+const retryInline    = $('#retry-inline');
+const btnRetryInline = $('#btn-retry-inline');
+let pendingRetryPayload = null;
+
+function showInlineRetry(payload) {
+  pendingRetryPayload = payload;
+  retryInline.style.display = 'block';
+}
+function hideInlineRetry() {
+  pendingRetryPayload = null;
+  retryInline.style.display = 'none';
+}
+
+btnRetryInline.addEventListener('click', async () => {
+  if (!pendingRetryPayload) return;
+  btnRetryInline.disabled = true;
+  btnRetryInline.textContent = 'Retrying…';
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pendingRetryPayload),
+    });
+    if (res.ok) {
+      // Remove from retry queue
+      const q = getRetryQueue().filter(p =>
+        !(p.session_id === pendingRetryPayload.session_id &&
+          p.character === pendingRetryPayload.character &&
+          JSON.stringify(p.strokes) === JSON.stringify(pendingRetryPayload.strokes))
+      );
+      saveRetryQueue(q);
+      updateRetryBadge();
+
+      state.totalSubmitted++;
+      state.passSubmitted++;
+      saveTotalSubmitted(state.totalSubmitted);
+      showToast('✓ Saved', 'success');
+      hideInlineRetry();
+      clearAllStrokes();
+      if (state.mode === 'prompted') advancePrompted();
+      updateUI();
+    } else {
+      const body = await res.json().catch(() => ({}));
+      showToast(body.message || `Error ${res.status}`, 'error');
+    }
+  } catch {
+    showToast('Still failing — will retry later', 'error');
+  }
+  btnRetryInline.disabled = false;
+  btnRetryInline.textContent = '⟳ Retry submission';
+});
+
+/* ============================================================
+   Button event listeners
+   ============================================================ */
+btnUndo.addEventListener('click', undoLastStroke);
+btnClear.addEventListener('click', () => { clearAllStrokes(); hideInlineRetry(); });
+btnSubmit.addEventListener('click', submitStrokes);
+
+/* ============================================================
+   Canvas resize observer
+   ============================================================ */
+const resizeObserver = new ResizeObserver(() => {
+  setupCanvas();
+  redrawAllStrokes();
+});
+resizeObserver.observe(canvasContainer);
+
+/* ============================================================
+   Init
+   ============================================================ */
+function init() {
+  state.sessionId = getOrCreateSession();
+  state.totalSubmitted = loadTotalSubmitted();
+
+  setupCanvas();
+  setMode('prompted');
+  updateRetryBadge();
+  updateUI();
+  updateControlStates();
+
+  // Opportunistically flush retry queue on load
+  if (getRetryQueue().length > 0) {
+    setTimeout(flushRetryQueue, 2000);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
