@@ -452,13 +452,18 @@
         <label>Submitted</label>
         <span class="value" id="info-total">0</span>
       </div>
+      <div class="info-row">
+        <label>Saved locally</label>
+        <span class="value" id="info-local-count">0</span>
+      </div>
       <div class="info-row" id="retry-row" style="display:none">
-        <label>Pending retries</label>
+        <label>Pending sync</label>
         <div class="value">
           <span id="info-retry-count">0</span>
-          <button class="chip-btn" id="btn-retry" style="margin-left:6px;font-size:11px;padding:3px 10px">Retry</button>
+          <button class="chip-btn" id="btn-retry" style="margin-left:6px;font-size:11px;padding:3px 10px">Sync now</button>
         </div>
       </div>
+      <button id="btn-download" class="ctrl-btn primary full-width" style="background:#30D158;">⬇ Download all samples (JSON)</button>
       <button class="ctrl-btn secondary full-width" data-close="info-panel">Close</button>
     </div>
   </div>
@@ -492,6 +497,7 @@ const STORAGE = {
   SESSION: 'sc_session_id',
   RETRY:   'sc_retry_queue',
   TOTAL:   'sc_total_submitted',
+  SAMPLES: 'sc_local_samples',
 };
 
 /* ============================================================
@@ -553,6 +559,34 @@ function loadTotalSubmitted() {
 }
 function saveTotalSubmitted(n) {
   localStorage.setItem(STORAGE.TOTAL, String(n));
+}
+
+/* ============================================================
+   Local samples store (offline-first)
+   ============================================================ */
+function getLocalSamples() {
+  try { return JSON.parse(localStorage.getItem(STORAGE.SAMPLES) || '[]'); }
+  catch { return []; }
+}
+function saveLocalSample(payload) {
+  const samples = getLocalSamples();
+  samples.push({ ...payload, saved_at: new Date().toISOString() });
+  localStorage.setItem(STORAGE.SAMPLES, JSON.stringify(samples));
+}
+function downloadSamplesJSON() {
+  const samples = getLocalSamples();
+  if (samples.length === 0) {
+    showToast('No samples to download yet', 'error');
+    return;
+  }
+  const blob = new Blob([JSON.stringify(samples, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `stroke-samples-${state.sessionId.slice(0, 8)}-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Downloaded ${samples.length} samples`, 'success');
 }
 
 /* ============================================================
@@ -803,51 +837,42 @@ async function submitStrokes() {
     strokes:    state.strokes.map(s => s.map(p => ({ x: p.x, y: p.y, t: p.t }))),
   };
 
-  state.submitting = true;
-  btnSubmit.textContent = '···';
-  btnSubmit.classList.add('submitting');
+  // ── OFFLINE-FIRST: always save locally, always advance ──
+  saveLocalSample(payload);
+  state.totalSubmitted++;
+  state.passSubmitted++;
+  saveTotalSubmitted(state.totalSubmitted);
+  showToast('✓ Saved locally', 'success');
+  hideInlineRetry();
+  clearAllStrokes();
 
-  let success = false;
+  if (state.mode === 'prompted') {
+    advancePrompted();
+  } else {
+    freeInput.value = '';
+    freeInput.focus();
+  }
+  updateUI();
+
+  // ── Background sync: try webhook, queue on failure ──
+  syncToWebhook(payload);
+}
+
+async function syncToWebhook(payload) {
   try {
     const res = await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (res.ok) {
-      success = true;
-    } else {
-      const body = await res.json().catch(() => ({}));
-      showToast(body.message || `Error ${res.status}`, 'error');
+    if (!res.ok) {
       enqueueRetry(payload);
-      showInlineRetry(payload);
-    }
-  } catch (err) {
-    showToast('Network error — saved for retry', 'error');
-    enqueueRetry(payload);
-    showInlineRetry(payload);
-  }
-
-  state.submitting = false;
-  btnSubmit.textContent = 'Submit →';
-  btnSubmit.classList.remove('submitting');
-
-  if (success) {
-    state.totalSubmitted++;
-    state.passSubmitted++;
-    saveTotalSubmitted(state.totalSubmitted);
-    showToast('✓ Saved', 'success');
-    clearAllStrokes();
-
-    if (state.mode === 'prompted') {
-      advancePrompted();
     } else {
-      freeInput.value = '';
-      freeInput.focus();
+      // Opportunistically flush any queued retries
+      flushRetryQueue();
     }
-    updateUI();
-    // Also try flushing retry queue opportunistically
-    flushRetryQueue();
+  } catch {
+    enqueueRetry(payload);
   }
 }
 
@@ -928,6 +953,7 @@ btnMode.addEventListener('click', () => {
 btnInfo.addEventListener('click', () => {
   $('#info-session-id').textContent = state.sessionId;
   $('#info-total').textContent = state.totalSubmitted;
+  $('#info-local-count').textContent = getLocalSamples().length;
   updateRetryBadge();
   infoPanel.classList.remove('hidden');
 });
@@ -947,6 +973,10 @@ $('#btn-copy-session').addEventListener('click', () => {
 
 $('#btn-retry').addEventListener('click', () => {
   flushRetryQueue();
+});
+
+$('#btn-download').addEventListener('click', () => {
+  downloadSamplesJSON();
 });
 
 $('#session-tag').addEventListener('click', () => {
